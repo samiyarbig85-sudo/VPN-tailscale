@@ -23,7 +23,7 @@ jobs:
 
     - name: Start Tailscale VPN
       run: |
-        sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes --exit-node
+        sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes --advertise-exit-node
 
     - name: Show Tailscale IP
       run: tailscale ip -4
