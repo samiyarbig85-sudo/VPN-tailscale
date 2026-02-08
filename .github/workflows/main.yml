@@ -1,0 +1,28 @@
+name: Linux Tailscale VPN
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+    - name: Install Tailscale
+      run: |
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+        sudo apt update
+        sudo apt install tailscale -y
+
+    - name: Start Tailscale VPN
+      run: |
+        sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes
+
+    - name: Show Tailscale IP
+      run: tailscale ip -4
+
+    - name: Keep job alive
+      run: |
+        while true; do sleep 300; done
