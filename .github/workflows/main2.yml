@@ -1,0 +1,29 @@
+name: Linux VNC LXQt Desktop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+    - name: Install LXQt Desktop + VNC
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lxqt-core lxqt-session openbox \
+          tightvncserver dbus-x11 x11-xserver-utils
+
+    - name: Setup VNC server without password
+      run: |
+        mkdir -p ~/.vnc
+        # ایجاد فایل passwd خالی تا VNC بدون پسورد اجرا بشه
+        touch ~/.vnc/passwd
+        chmod 600 ~/.vnc/passwd
+        # Start VNC server on display :1 with 1280x800 resolution, depth 24
+        vncserver :1 -geometry 1280x800 -depth 24 -SecurityTypes None
+
+    - name: Keep job alive
+      run: |
+        while true; do sleep 300; done
