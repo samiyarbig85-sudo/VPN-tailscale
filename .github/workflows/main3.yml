@@ -1,0 +1,41 @@
+name: macOS Tailscale + VNC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 360
+
+    steps:
+    - name: Install Tailscale
+      run: |
+        # دانلود آخرین نسخه Tailscale
+        curl -fsSL https://pkgs.tailscale.com/stable/tailscale-ipn.dmg -o tailscale.dmg
+        hdiutil attach tailscale.dmg
+        sudo installer -pkg /Volumes/Tailscale\ Installer/Tailscale.pkg -target /
+        hdiutil detach /Volumes/Tailscale\ Installer
+
+    - name: Start Tailscale VPN
+      run: |
+        sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTHKEY }}
+
+    - name: Show Tailscale IP
+      run: tailscale ip -4
+
+    - name: Enable macOS VNC (Screen Sharing) without password
+      run: |
+        # فعال کردن Remote Management (VNC)
+        sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+          -activate -configure -access -on -restart -agent
+        # اجازه VNC بدون پسورد
+        sudo defaults write /Library/Preferences/com.apple.RemoteManagement VNCAlwaysStart -bool true
+        sudo defaults write /Library/Preferences/com.apple.VNCServer ScreenSharingReqPermEnabled -bool false
+        # استارت دوباره ARD Agent
+        sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+          -restart -agent -privs -all
+
+    - name: Keep job alive
+      run: |
+        while true; do sleep 300; done
