@@ -36,11 +36,9 @@ jobs:
 
     - name: Setup VNC server
       run: |
-        mkdir -p ~/.vnc
-        echo "${{ secrets.samiyarbig }}" | vncpasswd -f > ~/.vnc/passwd
-        chmod 600 ~/.vnc/passwd
-        # Start VNC on display :1 with 1280x800 resolution
-        vncserver :1 -geometry 1280x800 -depth 24
+        
+        # Start VNC on display :1
+        vncserver :1
 
     - name: Keep job alive
       run: |
