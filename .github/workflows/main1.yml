@@ -1,0 +1,47 @@
+name: Linux Tailscale VPN + LXQt Desktop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+    - name: Install Tailscale
+      run: |
+        # Add Tailscale's GPG key
+        sudo mkdir -p --mode=0755 /usr/share/keyrings
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        # Add the Tailscale repository
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+        # Install Tailscale
+        sudo apt-get update && sudo apt-get install -y tailscale
+        # Start Tailscale (temporary, for setup)
+        sudo tailscale up
+
+    - name: Start Tailscale VPN
+      run: |
+        sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes
+
+    - name: Show Tailscale IP
+      run: tailscale ip -4
+
+    - name: Install LXQt Desktop + VNC
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lxqt-core lxqt-session openbox \
+          tightvncserver dbus-x11 x11-xserver-utils
+
+    - name: Setup VNC server
+      run: |
+        mkdir -p ~/.vnc
+        echo "${{ secrets.VNC_PASSWORD }}" | vncpasswd -f > ~/.vnc/passwd
+        chmod 600 ~/.vnc/passwd
+        # Start VNC on display :1 with 1280x800 resolution
+        vncserver :1 -geometry 1280x800 -depth 24
+
+    - name: Keep job alive
+      run: |
+        while true; do sleep 300; done
