@@ -1,0 +1,27 @@
+name: Deploy EC2
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::samiyarbig:role/YOUR_ROLE_NAME
+          aws-region: us-east-1
+
+      - name: Deploy to EC2
+        run: |
+          aws ec2 describe-instances
