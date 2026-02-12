@@ -1,0 +1,95 @@
+name: SSH
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-ssh:
+    runs-on: macos-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Configure Core SSH Settings
+        run: |
+          # Enable Remote Login (SSH)
+          sudo systemsetup -setremotelogin on
+
+          # macOS firewall: allow incoming SSH connections
+          sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
+          sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/sbin/sshd
+          sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /usr/sbin/sshd
+
+          echo "SSH enabled and firewall configured"
+
+      - name: Create SSH User with Secure Password
+        run: |
+          # Generate strong random password
+          PASSWORD=$(openssl rand -base64 16)
+
+          # Create user 'SSH'
+          sudo dscl . -create /Users/SSH
+          sudo dscl . -create /Users/SSH UserShell /bin/bash
+          sudo dscl . -create /Users/SSH RealName "SSH User"
+          sudo dscl . -create /Users/SSH UniqueID "1001"
+          sudo dscl . -create /Users/SSH PrimaryGroupID 20
+          sudo dscl . -create /Users/SSH NFSHomeDirectory /Users/SSH
+          sudo dscl . -passwd /Users/SSH $PASSWORD
+          sudo createhomedir -c -u SSH
+
+          # Add user to admin group
+          sudo dseditgroup -o edit -a SSH -t user admin
+
+          echo "SSH_CREDS=User: SSH | Password: $PASSWORD" >> $GITHUB_ENV
+          echo "SSH user created"
+
+      - name: Install Tailscale via Homebrew
+        run: |
+          # Install Homebrew if not present
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> $HOME/.zprofile
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+          fi
+
+          # Install latest Tailscale
+          brew install --cask tailscale
+          echo "Tailscale installed via Homebrew"
+
+      - name: Establish Tailscale Connection
+        run: |
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$GITHUB_RUN_ID
+
+          TS_IP=""
+          for i in {1..10}; do
+            TS_IP=$(tailscale ip -4)
+            if [ -n "$TS_IP" ]; then break; fi
+            sleep 5
+          done
+
+          if [ -z "$TS_IP" ]; then
+            echo "Tailscale IP not assigned. Exiting."
+            exit 1
+          fi
+
+          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+          echo "Tailscale IP: $TS_IP"
+
+      - name: Verify SSH Accessibility
+        run: |
+          echo "Testing TCP connection to SSH port 22 at $TAILSCALE_IP"
+          nc -zv $TAILSCALE_IP 22 -w 5 || echo "Port 22 may not be open yet"
+          echo "TCP connectivity test done"
+
+      - name: Maintain Connection
+        run: |
+          echo "=== SSH ACCESS ==="
+          echo "Address: $TAILSCALE_IP"
+          echo "Username: SSH"
+          echo "Password: $(echo $SSH_CREDS | cut -d'|' -f2)"
+          echo "================="
+
+          # Keep runner alive indefinitely
+          while true; do
+            echo "[$(date)] SSH + Tailscale active. Ctrl+C to stop."
+            sleep 300
+          done
